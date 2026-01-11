@@ -12,6 +12,7 @@ from dotenv import set_key, load_dotenv
 
 from ChatAIModuleAdapter import ChatAIModuleAdapter
 from ExplainTalkButtons import ExplainTalkButtons
+from GitHubCopilotTokenDialog import GitHubCopilotTokenDialog
 from InterprocessCommand import InterprocessCommand as IC
 from OpenAIAPIKeyDialog import OpenAIAPIKeyDialog
 from PostUpdateDialog import PostUpdateDialog
@@ -101,6 +102,9 @@ class AnkiBrain:
 
         self.openai_api_key_dialog = OpenAIAPIKeyDialog()
         self.openai_api_key_dialog.hide()
+        
+        self.github_copilot_token_dialog = GitHubCopilotTokenDialog()
+        self.github_copilot_token_dialog.hide()
 
         # Should go last because this object takes self and can call items.
         # Therefore, risk of things not completing setup.
@@ -118,6 +122,9 @@ class AnkiBrain:
     def setup_ui(self):
         mw.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.sidePanel)
         self.sidePanel.resize(500, mw.height())
+        
+        # Set up GitHub Copilot token dialog
+        self.github_copilot_token_dialog.on_token_save(self.handle_github_copilot_token_save)
 
         # Set up api key dialog.
         self.openai_api_key_dialog.on_key_save(self.handle_openai_api_key_save)
@@ -128,7 +135,8 @@ class AnkiBrain:
         # Hook for Anki's card webview JS function `pycmd`
         gui_hooks.webview_did_receive_js_message.append(self.handle_anki_card_webview_pycmd)
 
-        add_ankibrain_menu_item('Show/Hide AnkiBrain', self.toggle_panel)
+        add_ankibrain_menu_item('ShowSet GitHub Copilot Token...', self.show_github_copilot_token_dialog)
+            add_ankibrain_menu_item('/Hide AnkiBrain', self.toggle_panel)
         add_ankibrain_menu_item('Switch User Mode...', show_user_mode_dialog)
 
         if self.user_mode == UserMode.LOCAL:
@@ -224,6 +232,13 @@ class AnkiBrain:
         set_key(dotenv_path, 'OPENAI_API_KEY', key)
         os.environ['OPENAI_API_KEY'] = key
         self.restart_async_members_from_sync()
+    
+    def handle_github_copilot_token_save(self, token):
+        """Handle saving GitHub Copilot token"""
+        self.github_copilot_token_dialog.hide()
+        set_key(dotenv_path, 'GITHUB_COPILOT_TOKEN', token)
+        os.environ['GITHUB_COPILOT_TOKEN'] = token
+        self.restart_async_members_from_sync()
 
     def _handle_process_signal(self, signal, frame):
         try:
@@ -278,6 +293,10 @@ class AnkiBrain:
 
     def show_openai_api_key_dialog(self):
         self.openai_api_key_dialog.show()
+    
+    def show_github_copilot_token_dialog(self):
+        """Show GitHub Copilot token dialog"""
+        self.github_copilot_token_dialog.show()
 
     def handle_anki_card_webview_pycmd(self, handled, cmd, context):
         try:

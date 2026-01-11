@@ -15,6 +15,7 @@ from ChatAIWithDocuments import ChatAIWithDocuments
 from ChatAIWithoutDocuments import ChatAIWithoutDocuments
 from InterprocessCommand import InterprocessCommand as IC
 from langchain.callbacks import get_openai_callback
+from LLMProvider import LLMProviderType
 
 
 def _module_return(data: dict[str, str]):
@@ -45,9 +46,32 @@ def module_error(text: str):
     })
 
 
+def check_credentials():
+    """Check if required credentials are available based on the selected provider"""
+    # Load settings to check which provider is configured
+    with open(path.join(user_data_dir, 'settings.json'), 'r') as f:
+        settings = json.load(f)
+        provider_str = settings.get('llmProvider', 'openai')
+    
+    try:
+        provider_type = LLMProviderType(provider_str)
+    except ValueError:
+        provider_type = LLMProviderType.OPENAI
+    
+    if provider_type == LLMProviderType.OPENAI:
+        if os.getenv('OPENAI_API_KEY') is None:
+            module_error('Please set OPENAI_API_KEY')
+            return False
+    elif provider_type == LLMProviderType.GITHUB_COPILOT:
+        if os.getenv('GITHUB_COPILOT_TOKEN') is None:
+            module_error('Please set GITHUB_COPILOT_TOKEN')
+            return False
+    
+    return True
+
+
 def handle_module_input(data: dict[str, Any]):
-    if os.getenv('OPENAI_API_KEY') is None:
-        module_error('Please set OPENAI_API_KEY')
+    if not check_credentials():
         return
 
     cmd = data['cmd']
@@ -152,10 +176,10 @@ if __name__ == '__main__':
 
         load_dotenv(dotenv_path, override=True)
 
-        if os.getenv('OPENAI_API_KEY') is not None:
+        # Initialize AI modules if credentials are available
+        if check_credentials():
             withDocumentsAI = ChatAIWithDocuments()
             withoutDocumentsAI = ChatAIWithoutDocuments()
-
             withoutDocumentsSingleQuery = ChatAIWithoutDocuments()
 
         # Send ready message now after finished loading above.

@@ -4,7 +4,6 @@ from os import path
 from typing import Tuple, List
 
 from langchain.chains import ConversationalRetrievalChain
-from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import TextLoader, PyPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader, \
     UnstructuredHTMLLoader
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -14,6 +13,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
 
 from ChatInterface import ChatInterface
+from LLMProvider import LLMProviderFactory, LLMProviderType
 
 
 def get_file_extension(file_name: str) -> str:
@@ -60,12 +60,28 @@ class ChatAIWithDocuments(ChatInterface):
 
         temperature = 0
         model_name = 'gpt-3.5-turbo'
+        provider_type = LLMProviderType.OPENAI  # default
+        
         with open(settings_path, 'r') as f:
             data = json.load(f)
-            temperature = data['temperature']
-            model_name = data['llmModel']
+            temperature = data.get('temperature', 0)
+            model_name = data.get('llmModel', 'gpt-3.5-turbo')
+            
+            # Get provider type from settings
+            provider_str = data.get('llmProvider', 'openai')
+            try:
+                provider_type = LLMProviderType(provider_str)
+            except ValueError:
+                provider_type = LLMProviderType.OPENAI
 
-        self.llm = ChatOpenAI(temperature=temperature, model_name=model_name)
+        # Create LLM using provider factory
+        provider = LLMProviderFactory.create_provider(
+            provider_type=provider_type,
+            model_name=model_name,
+            temperature=temperature
+        )
+        self.llm = provider.get_llm()
+        
         self.vectorstore = Chroma(embedding_function=HuggingFaceEmbeddings(), persist_directory=persist_directory)
         self.memory = ConversationBufferMemory(memory_key="chat_history", output_key='answer',
                                                return_messages=True)
